@@ -136,11 +136,11 @@ class IMMEstimator(object):
         self.mu = asarray(mu) / np.sum(mu)
         self.M = M
 
-        x_shape = filters[0].x.shape
-        for f in filters:
-            if x_shape != f.x.shape:
-                raise ValueError(
-                    'All filters must have the same state dimension')
+#        x_shape = filters[0].x.shape
+#        for f in filters:
+#            if x_shape != f.x.shape:
+#                raise ValueError(
+#                    'All filters must have the same state dimension')
 
         self.x = zeros(filters[0].x.shape)
         self.P = zeros(filters[0].P.shape)
@@ -230,11 +230,11 @@ class IMMEstimator(object):
         """
         self.x.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            self.x += f.x * mu
+            self.x = self.add_available(self.x, f.x * mu)
 
         self.P.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            y = f.x - self.x
+            y = self.add_available(f.x, - self.x)
             self.P += mu * (outer(y, y) + f.P)
 
     def _compute_mixing_probabilities(self):
@@ -263,3 +263,12 @@ class IMMEstimator(object):
             pretty_str('likelihood', self.likelihood),
             pretty_str('omega', self.omega)
             ])
+    
+    def add_available(self, a, b):
+        if len(a) < len(b):
+            c = b.copy()
+            c[:len(a)] += a
+        else:
+            c = a.copy()
+            c[:len(b)] += b
+        return c;
