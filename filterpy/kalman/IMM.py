@@ -202,14 +202,15 @@ class IMMEstimator(object):
         for i, (f, w) in enumerate(zip(self.filters, self.omega.T)):
             x = zeros(self.x.shape)
             for kf, wj in zip(self.filters, w):
-                x += kf.x * wj
-            xs.append(x)
+                x = self.add(x, kf.x * wj)
+            xs.append(x[:f.x.shape[0]])
 
             P = zeros(self.P.shape)
             for kf, wj in zip(self.filters, w):
-                y = kf.x - x
-                P += wj * (outer(y, y) + kf.P)
-            Ps.append(P)
+                y = self.add(kf.x, -x)
+                P = self.add(P, wj * (
+                        self.add(outer(y, y) , kf.P)))
+            Ps.append(P[:f.P.shape[0],:f.P.shape[0]])
 
         #  compute each filter's prior using the mixed initial conditions
         for i, f in enumerate(self.filters):
@@ -230,12 +231,13 @@ class IMMEstimator(object):
         """
         self.x.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            self.x = self.add_available(self.x, f.x * mu)
+            self.x = self.add(self.x, f.x * mu)
 
         self.P.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            y = self.add_available(f.x, - self.x)
-            self.P += mu * (outer(y, y) + f.P)
+            y = self.add_available_vector(f.x, - self.x)
+            self.P = self.add(self.P, 
+                                         (self.add(mu *outer(y, y) , mu *f.P)))
 
     def _compute_mixing_probabilities(self):
         """
@@ -264,11 +266,30 @@ class IMMEstimator(object):
             pretty_str('omega', self.omega)
             ])
     
-    def add_available(self, a, b):
+    def add(self, a:np.array, b:np.array):
+        "adds dissimilar sized arrays"
+        if ((a.ndim == 1) or (b.ndim == 1)):
+            return self.add_available_vector(a, b);
+        return self.add_available(a, b)
+    
+    def add_available_vector(self, a:np.array, b:np.array):
         if len(a) < len(b):
-            c = b.copy()
-            c[:len(a)] += a
+            c = b.copy()*1.0
+            c[:len(a)] += a*1.0
         else:
             c = a.copy()
-            c[:len(b)] += b
+            c[:len(b)] += b*1.0
+        return c;
+    
+    def add_available(self, a:np.array, b:np.array):
+        if len(a) <= len(b):
+            bigger = b;
+            smaller = a;       
+        else:
+            bigger = a;
+            smaller = b;
+        
+        c = bigger.copy()*1.0
+        dimx, dimy = smaller.shape;
+        c[:dimx,:dimy] += smaller*1.0
         return c;
