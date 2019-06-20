@@ -997,6 +997,24 @@ class KalmanFilter(object):
             P[k] += dot(dot(K[k], P[k+1] - Pp[k]), K[k].T)
 
         return (x, P, K, Pp)
+    
+    def _rts_backstep(self,x_filtered, P_filtered,
+                 x_filtered_next, P_filtered_next,
+                 x_predicted_next = None, P_predicted_next = None,
+                 F = None, Q=None, inv=np.linalg.inv):
+        if F is None:
+            F = self.F
+        if Q is None:
+            Q = [self.Q]
+        if x_predicted_next is None:
+            x_predicted_next = dot(F, x_filtered)
+        if P_predicted_next is None:
+            P_predicted_next = dot(dot(F, P_filtered), F.T) + Q
+    
+        K  = dot(dot(P_filtered, F.T), inv(P_predicted_next))
+        x = x_filtered + dot(K, x_filtered_next - x_predicted_next)
+        P = P_filtered - dot(dot(K, P_filtered_next - P_predicted_next), K.T)
+        return (x,P)
 
     def get_prediction(self, u=0):
         """
